@@ -16,8 +16,21 @@
 #error "Unknown Platform."
 #endif
 
+
+
 #if defined(DLIB_OS_WINDOWS)
 
+#ifndef WINVER
+#define WINVER 0x0501
+#endif
+
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT 0x0501
+#endif
+
+#ifndef _WIN32_WINDOWS
+#define _WIN32_WINDOWS 0x0501
+#endif
 
 #if defined(_MSC_VER) && !defined(_MT)
 #error Must compile with /MD, /MDd, /MT or /MTd
@@ -42,7 +55,9 @@
 #pragma warning(disable:4675)	// resolved overload was found by argument-dependent lookup
 #pragma warning(disable:4996)	// VC++ 8.0 deprecation warnings
 #endif
+
 #endif
+
 
 #endif // PLATFORM_CONFIG_H__
 

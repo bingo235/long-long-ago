@@ -2,6 +2,7 @@
 
 dlib::net::CNetIoScheduler::CNetIoScheduler()
 : m_is_running(false)
+, m_strand(m_ioservice)
 {
 
 }

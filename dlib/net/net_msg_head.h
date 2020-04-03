@@ -13,9 +13,9 @@ namespace dlib
 			int32_t len;
 			int32_t id;
 		};
-		static const uint32_t sc_net_msg_head_len = sizeof(NetMsgHead);
 #pragma pack(pop)
 	}
+    static const uint32_t sc_net_msg_head_len = sizeof(net::NetMsgHead);
 }
 
 

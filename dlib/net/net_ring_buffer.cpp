@@ -1,5 +1,5 @@
 #include "net_ring_buffer.h"
-#include "../dcommon.h"
+#include "../common/common.h"
 #include <sstream>
 
 dlib::net::CNetRingBuffer::CNetRingBuffer( alloc_buffer_hander hander, uint32_t size )
@@ -31,7 +31,7 @@ void* dlib::net::CNetRingBuffer::GetDataPtrByLen( uint32_t data_len )
 	if(m_buffer_size <= data_len)
 		return 0;
 
-	if(0 != m_pos_head && IsEmpty())
+	if(0 != m_pos_head && m_pos_head == m_pos_tail)
 		Reset();
 
 	if(m_pos_tail > m_pos_head)
@@ -59,7 +59,9 @@ void* dlib::net::CNetRingBuffer::GetDataPtrByLen( uint32_t data_len )
 
 void dlib::net::CNetRingBuffer::Pop()
 {
-	if(IsEmpty())
+	boost::recursive_mutex::scoped_lock lk(m_lock);
+
+	if(m_pos_head == m_pos_tail)
 		return;
 
 	NetMsgHead* header = (NetMsgHead*)(m_data + m_pos_head);
@@ -81,7 +83,7 @@ dlib::uint32_t dlib::net::CNetRingBuffer::GetDataLen()
 	}
 	else if(m_pos_tail < m_pos_head)
 	{
-		data_len = m_head_size - (m_pos_head - m_pos_tail);
+		data_len = m_buffer_size - (m_pos_head - m_pos_tail);
 	}
 	return data_len;
 }
@@ -96,6 +98,12 @@ std::string dlib::net::CNetRingBuffer::GetDebugInfo()
 	return ss.str();
 }
 
+bool dlib::net::CNetRingBuffer::IsEmpty()
+{
+    boost::recursive_mutex::scoped_lock lk(m_lock);
+    return m_pos_head == m_pos_tail;
+}
+
 ////////////////////////
 dlib::net::CNetSendBuffer::CNetSendBuffer( alloc_buffer_hander hander, uint32_t size )
 : CNetRingBuffer(hander, size)
@@ -105,11 +113,13 @@ dlib::net::CNetSendBuffer::CNetSendBuffer( alloc_buffer_hander hander, uint32_t 
 
 bool dlib::net::CNetSendBuffer::Push( const void *data_ptr, uint32_t data_len )
 {
+	boost::recursive_mutex::scoped_lock lk(m_lock);
+
 	if( data_len <= 0 )
 		return true;
 
 	void* buffer_ptr = GetDataPtrByLen(data_len);
-	if( data_ptr )
+	if( buffer_ptr )
 	{
 		memcpy((char*)buffer_ptr, data_ptr, data_len);
 		m_pos_tail += data_len;
@@ -120,7 +130,8 @@ bool dlib::net::CNetSendBuffer::Push( const void *data_ptr, uint32_t data_len )
 
 void* dlib::net::CNetSendBuffer::Front( uint32_t &data_len )
 {
-	if(IsEmpty())
+	boost::recursive_mutex::scoped_lock lk(m_lock);
+	if(m_pos_head == m_pos_tail)
 	{
 		data_len = 0;
 		return 0;
@@ -134,30 +145,22 @@ void* dlib::net::CNetSendBuffer::Front( uint32_t &data_len )
 dlib::net::CNetRecvBuffer::CNetRecvBuffer( alloc_buffer_hander hander, uint32_t size )
 : CNetRingBuffer(hander, size)
 {
-	m_is_stop_recv = false;
-	m_is_head_read = false;
 }
 
 void* dlib::net::CNetRecvBuffer::OpenForRecv(uint32_t data_len)
 {
-	void *data_ptr = GetDataPtrByLen( data_len );
-	if( data_ptr )
-	{
-		m_is_stop_recv = false;
-		return data_ptr;
-	}
-	m_is_stop_recv = true;
-	return 0;
+	boost::recursive_mutex::scoped_lock lk(m_lock);
+	return GetDataPtrByLen( data_len );
 }
 
 bool dlib::net::CNetRecvBuffer::FinishRecv( uint32_t data_len )
 {
+	boost::recursive_mutex::scoped_lock lk(m_lock);
 	if(data_len <= 0)
 		return true;
 
 	NetMsgHead* header = (NetMsgHead*)(m_data + m_pos_tail);
-	if(header->len = m_recv_head.len && 
-		header->len == data_len)
+	if(header->len == data_len)
 	{
 		m_pos_tail += data_len;
 		return true;
@@ -171,9 +174,13 @@ bool dlib::net::CNetRecvBuffer::FinishRecv( uint32_t data_len )
 
 void* dlib::net::CNetRecvBuffer::Front( uint32_t &data_len )
 {
-	data_len = 0;
-	if(IsEmpty())
+	boost::recursive_mutex::scoped_lock lk(m_lock);
+	
+	if(m_pos_head == m_pos_tail)
+    {
+        data_len = 0;
 		return 0;
+    }
 
 	NetMsgHead* header = (NetMsgHead*)(m_data + m_pos_head);
 	data_len = header->len;

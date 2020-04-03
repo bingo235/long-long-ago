@@ -36,9 +36,9 @@ namespace dlib
 			CNetAllocMg();
 			~CNetAllocMg();
 
-			bool AddAlloc(uint32_t alloc_size, uint32_t max_count);
+			bool AddAlloc(uint32_t alloc_size, uint32_t max_count = 10000);
 			bool AllocBuffer(char*& buffer, uint32_t size);
-			void FreeBuffer(char*& buffer, uint32_t size);
+			bool FreeBuffer(char*& buffer, uint32_t size);
 
 			static void AutoTest();
 		private:

@@ -11,9 +11,9 @@ namespace net{
     {
 	public:
 		T							value;
-		Base_Node<T>* volatile	pnext;
+		Base_Node<T>* volatile		pnext;
 
-		Base_Node( void ) : value( ), pnext( 0 ) { }
+		Base_Node( void ) : value(), pnext( 0 ) { }
 
 	private:
 		Base_Node( const Base_Node& );

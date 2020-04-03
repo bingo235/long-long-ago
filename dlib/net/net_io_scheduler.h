@@ -16,7 +16,8 @@ namespace net{
 
 		void Start(uint32_t thread_num = 4);
 		void Shutdown();
-		boost::asio::io_service& GetIoservice() { return m_ioservice; };
+		boost::asio::io_service&	GetIoservice() { return m_ioservice; };
+		boost::asio::strand&		GetStrand() { return m_strand; };
 
 	private:
 		CNetIoScheduler();
@@ -27,6 +28,7 @@ namespace net{
 		bool									m_is_running;
 		ThreadPool								m_thread_pool;
 		boost::asio::io_service	                m_ioservice;
+		boost::asio::strand						m_strand;
 	};
 }
 NS_DLIB_END

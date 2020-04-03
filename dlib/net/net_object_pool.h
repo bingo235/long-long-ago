@@ -2,6 +2,8 @@
 #define NET_OBJECT_POOL_H__
 #include "../common/common.h"
 #include "net_stack_queue.h"
+#include <list>
+#include <boost/thread.hpp>
 NS_DLIB_BEGIN
 namespace net{
 
@@ -9,11 +11,10 @@ namespace net{
     class CNetObjectPool
     {
     public:
-        typedef Base_Node<T> node;
-
         CNetObjectPool()
         {
-			m_pool_count = 0;
+			m_pool_size = 0;
+			m_pool_free_size = 0;
         }
 
         ~CNetObjectPool()
@@ -23,107 +24,60 @@ namespace net{
 
         void* AllocObj( void )
         {
-            node *temp_node = 0;
+			boost::recursive_mutex::scoped_lock l(m_lock);
+
             uint32_t loop = 0;
-            while (!(temp_node = m_pool.Pop()))
+            while (m_pool.empty())
             {
                 ++loop;
                 AddNewObject();
                 if(loop > 100)
                     break;
             }
-			
-            return temp_node;
+			T* temp_obj = m_pool.front();
+			m_pool.pop_front();
+			--m_pool_free_size;
+            return temp_obj;
         }
 
         void FreeObj(void* object)
         {
+			boost::recursive_mutex::scoped_lock l(m_lock);
+
             if(object)
-                m_pool.Push( reinterpret_cast<node*>(object));
+			{
+                m_pool.push_back(reinterpret_cast<T*>(object));
+				++m_pool_free_size;
+			}
         }
 
 		uint32_t Size()
 		{
-			return	m_pool_count;
+			return	m_pool_size;
 		}
 
 		uint32_t FreeSize()
 		{
-			return m_pool.Size();
+			return m_pool_free_size;
 		}
 
         T* NewObj(void)
         {
-			void* object = AllocObj();
+			void* obj = AllocObj();
 
-			if ( object )	
-				return ( T* )( ::new(object)T() );
+			if ( obj )	
+				return (T*)(::new(obj)T());
 
 			return 0;
         }
 
-        template<class P0>
-        T* NewObj( P0 p0 )
-        {
-            void* object = AllocObj();
-
-            if ( object )	
-                return ( T* )( ::new(object)T( p0 ) );
-
-            return 0;
-        }
-
-        template<class P0, class P1>
-        T* NewObj( P0 p0, P1 p1 )
-        {
-            void* object = AllocObj();
-
-            if ( object )	
-                return ( T* )( ::new(object)T( p0, p1) );
-
-            return 0;
-        }
-
-        template<class P0, class P1, class P2>
-        T* NewObj( P0 p0, P1 p1, P2 p2 )
-        {
-            void* object = AllocObj();
-
-            if ( object )	
-                return ( T* )( ::new(object)T( p0, p1, p2) );
-
-            return 0;
-        }
-
-        template<class P0, class P1, class P2, class P3>
-        T* NewObj( P0 p0, P1 p1, P2 p2, P3 p3 )
-        {
-            void* object = AllocObj();
-
-            if ( object )	
-                return ( T* )( ::new(object)T( p0, p1, p2, p3) );
-
-            return 0;
-        }
-
-        template<class P0, class P1, class P2, class P3, class P4>
-        T* NewObj( P0 p0, P1 p1, P2 p2, P3 p3, P4 p4 )
-        {
-            void* object = AllocObj();
-
-            if ( object )	
-                return ( T* )( ::new(object)T( p0, p1, p2, p3, p4) );
-
-            return 0;
-        }
-
-		template<class P0, class P1, class P2, class P3, class P4, class P5>
-		T* NewObj( P0 p0, P1 p1, P2 p2, P3 p3, P4 p4, P5 p5)
+		template<class P0>
+		T* NewObj( P0 p0 )
 		{
-			void* object = AllocObj();
+			void* obj = AllocObj();
 
-			if ( object )	
-				return ( T* )( ::new(object)T( p0, p1, p2, p3, p4, p5) );
+			if (obj)	
+				return (T*)(::new(obj)T(p0));
 
 			return 0;
 		}
@@ -139,12 +93,17 @@ namespace net{
 
         void ClearPool( void )
         {
-            node *temp_node = 0;
-            while ((temp_node = m_pool.Pop()))
-            {
-                free(temp_node);
-            }
-			m_pool_count = 0;
+			boost::recursive_mutex::scoped_lock l(m_lock);
+
+            T* temp_obj = 0;
+			while( !m_pool.empty() )
+			{
+				temp_obj = m_pool.front();
+				free((void*)temp_obj);
+				m_pool.pop_front();
+			}
+			m_pool_size = 0;
+			m_pool_free_size = 0;
         }
 
     private:
@@ -153,22 +112,24 @@ namespace net{
             uint32_t count = ALLOC_OBJECT_COUNT;
             count = count > 0 ? count : 1;
 
-            node* temp_node = 0;
+            T* temp_obj = 0;
             for (uint32_t i = 0; i < count; ++i)
             {
-                temp_node = (node*)(malloc(sizeof(node)));
-                if (temp_node)
+                temp_obj = (T*)(malloc(sizeof(T)));
+                if (temp_obj)
                 {
-                    temp_node->pnext = 0;
-                    m_pool.Push( temp_node );
-					++m_pool_count;
+                    m_pool.push_back( temp_obj );
+					++m_pool_size;
+					++m_pool_free_size;
                 }
             }
         }
 
     private:
-        CBase_Stack<T>	m_pool;
-		uint32_t		m_pool_count;
+		std::list<T*>	m_pool;
+		uint32_t		m_pool_size;
+		uint32_t		m_pool_free_size;
+		boost::recursive_mutex  m_lock;
 
 		CNetObjectPool( const CNetObjectPool& );
 		CNetObjectPool& operator=( const CNetObjectPool& );

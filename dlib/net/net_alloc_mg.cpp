@@ -114,16 +114,17 @@ bool dlib::net::CNetAllocMg::AllocBuffer( char*& buffer, uint32_t size )
 	return iter->second->AllocBuffer(buffer);
 }
 
-void dlib::net::CNetAllocMg::FreeBuffer( char*& buffer, uint32_t size )
+bool dlib::net::CNetAllocMg::FreeBuffer( char*& buffer, uint32_t size )
 {
 	MAP_ALLOCITEM::iterator iter = m_map_alloc.find(size);
 	if(iter == m_map_alloc.end())
 	{
 		NETLOG_ERROR("FreeBuffer fail. size="<<size<<FUN_FILE_LINE);
-		return;
+		return false;
 	}
 
 	iter->second->FreeBuffer(buffer);
+    return true;
 }
 
 void dlib::net::CNetAllocMg::AutoTest()

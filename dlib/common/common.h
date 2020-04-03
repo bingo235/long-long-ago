@@ -13,4 +13,6 @@
 #define NETLOG_ERROR(MSG)	do{std::ostringstream ss;ss<<MSG<<std::endl;std::cout<<ss.str();}while(0)
 #define FUN_FILE_LINE		" ;"<<__FUNCTION__<<"(); File:"<<__FILE__<<" Line:"<<__LINE__
 
+#define NETLOG_TRACE(MSG)	do{std::ostringstream ss;ss<<MSG<<std::endl;std::cout<<ss.str();}while(0)
+
 #endif // COMMON_H__

@@ -1,10 +1,10 @@
 #ifndef net_ring_buffer_h__
 #define net_ring_buffer_h__
-#include <boost/function.hpp>
-#include <string>
 #include "../common/common.h"
 #include "net_msg_head.h"
-
+#include <boost/function.hpp>
+#include <boost/thread.hpp>
+#include <string>
 namespace dlib
 {
 	namespace net
@@ -26,9 +26,10 @@ namespace dlib
 		public:
 			uint32_t	GetDataLen();
 			uint32_t	GetMaxLen()		{ return m_buffer_size; }
-			bool		IsEmpty()		{ return m_pos_head == m_pos_tail; }
+			bool		IsEmpty();
 			void		Pop();
 			std::string	GetDebugInfo();
+            bool        IsAllocOk()     { return 0 != m_data; }
 
 		protected:
 			char*                    	m_data;
@@ -38,6 +39,7 @@ namespace dlib
 			uint32_t					m_head_size;
 			uint32_t					m_buffer_size;
 			alloc_buffer_hander			m_alloc_hander;
+			boost::recursive_mutex      m_lock;
 		};
 
 		class CNetSendBuffer : public CNetRingBuffer
@@ -59,15 +61,6 @@ namespace dlib
 			void*	OpenForRecv(uint32_t data_len);
 			bool	FinishRecv(uint32_t data_len);
 			void*	Front(uint32_t &data_len);
-
-			bool	is_stop_recv() { return m_is_stop_recv; }
-			bool	is_head_read() { return m_is_head_read; }
-			void*	recv_head()    { return &m_recv_head; }	
-
-		private:
-			bool		m_is_stop_recv;
-			bool		m_is_head_read;
-			NetMsgHead	m_recv_head;
 		};
 	}
 }
